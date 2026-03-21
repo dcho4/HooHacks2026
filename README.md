@@ -1,2 +1,3 @@
 # HooHacks2026
-Website to optimize focus and studying. Based on Treisman's Attenuation Theory
+Baby Boo. Application to help first-time parents maximize the care for their newborn.
+
