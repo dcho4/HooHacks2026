@@ -1,0 +1,34 @@
+{
+  "babyProfile": {
+    "firstName": "David",
+    "lastName": "Cho",
+    "dateOfBirth": "2024-03-22",
+    "sex": "Male",
+    "hasMedicalConditions": true,
+    "medicalConditions": [
+      "Jaundice",
+      "Respiratory Issues"
+    ],
+    "familyHistory": [
+      "Heart Disease",
+      "Diabetes (Type 1)"
+    ],
+    "familyHistoryOther": "",
+    "state": "Illinois",
+    "onboardingComplete": true
+  },
+  "feedLogs": [],
+  "sleepLogs": [
+    {
+      "start": "01:04",
+      "end": "08:04",
+      "note": "",
+      "id": 1774155900464,
+      "timestamp": "2026-03-22T05:05:00.464Z"
+    }
+  ],
+  "growthEntries": [],
+  "vaccineStatus": {},
+  "parentName": "Brandon",
+  "updatedAt": 1774156003711
+}
