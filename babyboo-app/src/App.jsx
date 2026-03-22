@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import Layout from './components/Layout';
 import Onboarding from './pages/Onboarding';
+import Login from './pages/Login';
 import Home from './pages/Home';
 import Chatbot from './pages/Chatbot';
 import Family from './pages/Family';
@@ -9,16 +10,27 @@ import Medical from './pages/Medical';
 import SettingsPage from './pages/Settings';
 
 function AppRoutes() {
-  const { babyProfile } = useApp();
+  const { babyProfile, isLoggedIn, isLoading } = useApp();
   const onboarded = babyProfile.onboardingComplete;
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', fontFamily: 'var(--font)' }}>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  const getLandingPage = () => {
+    if (isLoggedIn && onboarded) return <Navigate to="/home" replace />;
+    if (isLoggedIn && !onboarded) return <Onboarding />;
+    return <Login />;
+  };
 
   return (
     <Routes>
-      <Route
-        path="/"
-        element={onboarded ? <Navigate to="/home" replace /> : <Onboarding />}
-      />
-      <Route element={onboarded ? <Layout /> : <Navigate to="/" replace />}>
+      <Route path="/" element={getLandingPage()} />
+      <Route element={isLoggedIn && onboarded ? <Layout /> : <Navigate to="/" replace />}>
         <Route path="/home" element={<Home />} />
         <Route path="/chat" element={<Chatbot />} />
         <Route path="/family" element={<Family />} />
