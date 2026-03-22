@@ -11,6 +11,19 @@ const ALL_MEDICAL_CONDITIONS = [
   'Down Syndrome', 'Other',
 ];
 
+const US_STATES = [
+  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado',
+  'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho',
+  'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana',
+  'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota',
+  'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada',
+  'New Hampshire', 'New Jersey', 'New Mexico', 'New York',
+  'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon',
+  'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+  'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+  'West Virginia', 'Wisconsin', 'Wyoming', 'District of Columbia',
+];
+
 const FAMILY_HISTORY_OPTIONS = [
   'Heart Disease', 'Diabetes (Type 1)', 'Diabetes (Type 2)', 'Cancer',
   'Asthma', 'Allergies', 'Mental Health Conditions', 'Autoimmune Disorders',
@@ -248,7 +261,12 @@ export default function Medical() {
               </div>
               <div className="info-field">
                 <label>State</label>
-                {editing ? <input type="text" value={form.state || ''} onChange={(e) => setForm({ ...form, state: e.target.value })} /> : <span className="info-value">{babyProfile.state || '—'}</span>}
+                {editing ? (
+                  <select value={form.state || ''} onChange={(e) => setForm({ ...form, state: e.target.value })}>
+                    <option value="">Select state</option>
+                    {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                ) : <span className="info-value">{babyProfile.state || '—'}</span>}
               </div>
             </div>
           </section>

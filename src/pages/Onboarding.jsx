@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Baby, Heart, ArrowRight, ArrowLeft, Stethoscope, Star, Shield, BookOpen, Mail, Lock, User, AlertCircle } from 'lucide-react';
+import { Baby, Heart, ArrowRight, ArrowLeft, Stethoscope, Star, Shield, BookOpen, Mail, Lock, User, AlertCircle, Users } from 'lucide-react';
 
 const MEDICAL_CONDITIONS = [
   'Diabetes', 'Heart Condition', 'Premature Birth', 'Jaundice',
@@ -83,9 +83,14 @@ function ScrollColumn({ items, selectedIndex, onSelect, label }) {
 }
 
 export default function Onboarding() {
-  const { setBabyProfile, setParentName, parentName, setAccount, setIsLoggedIn, hasAuth0, auth0User } = useApp();
+  const { setBabyProfile, setParentName, parentName, setAccount, setIsLoggedIn, hasAuth0, auth0User, joinFamily } = useApp();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
+
+  // Role selection
+  const [role, setRole] = useState(''); // 'parent' or 'coparent'
+  const [joinCode, setJoinCode] = useState('');
+  const [joinError, setJoinError] = useState('');
 
   // Account (local mode only)
   const [email, setEmail] = useState('');
@@ -138,22 +143,26 @@ export default function Onboarding() {
     setFamilyHistory((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]);
   };
 
-  /*
-    Steps (local mode):    0=Welcome, 1=Account, 2=Parent, 3=Baby, 4=DOB, 5=Sex, 6=State, 7=Medical?, 8=Conditions, 9=FamilyHistory
-    Steps (Auth0 mode):    0=Welcome, 1=Parent, 2=Baby, 3=DOB, 4=Sex, 5=State, 6=Medical?, 7=Conditions, 8=FamilyHistory
-  */
-  const STEP_ACCOUNT = skipAccountStep ? -1 : 1;
-  const offset = skipAccountStep ? 1 : 0;
-  const STEP_PARENT = 2 - offset;
-  const STEP_BABY = 3 - offset;
-  const STEP_DOB = 4 - offset;
-  const STEP_SEX = 5 - offset;
-  const STEP_STATE = 6 - offset;
-  const STEP_MEDICAL = 7 - offset;
-  const STEP_CONDITIONS = 8 - offset;
-  const STEP_FAMILY_HISTORY = 9 - offset;
+  const isCoParent = role === 'coparent';
 
-  // Live validation errors for account step
+  /*
+    Steps (local, parent):  0=Welcome, 1=Role, 2=Account, 3=Parent, 4=Baby, 5=DOB, 6=Sex, 7=State, 8=Medical?, 9=Conditions, 10=FamilyHistory
+    Steps (local, coparent): 0=Welcome, 1=Role (join code), 2=Account, 3=Parent, done
+    Steps (auth0, parent):  0=Welcome, 1=Role, 2=Parent, 3=Baby, 4=DOB, 5=Sex, 6=State, 7=Medical?, 8=Conditions, 9=FamilyHistory
+    Steps (auth0, coparent): 0=Welcome, 1=Role (join code), 2=Parent, done
+  */
+  const STEP_ROLE = 1;
+  const STEP_ACCOUNT = skipAccountStep ? -1 : 2;
+  const baseOffset = skipAccountStep ? 1 : 0;
+  const STEP_PARENT = 3 - baseOffset;
+  const STEP_BABY = 4 - baseOffset;
+  const STEP_DOB = 5 - baseOffset;
+  const STEP_SEX = 6 - baseOffset;
+  const STEP_STATE = 7 - baseOffset;
+  const STEP_MEDICAL = 8 - baseOffset;
+  const STEP_CONDITIONS = 9 - baseOffset;
+  const STEP_FAMILY_HISTORY = 10 - baseOffset;
+
   const getAccountErrors = () => {
     const errs = [];
     if (email.trim() && !email.includes('@')) errs.push('Enter a valid email address');
@@ -163,9 +172,21 @@ export default function Onboarding() {
     return errs;
   };
 
+  const getTotalSteps = () => {
+    if (isCoParent) return STEP_PARENT + 1; // ends after parent name
+    return hasMedical ? STEP_FAMILY_HISTORY + 1 : STEP_FAMILY_HISTORY;
+  };
+
+  const totalSteps = getTotalSteps();
+
   const canNext = () => {
     switch (step) {
       case 0: return true;
+      case STEP_ROLE: {
+        if (!role) return false;
+        if (isCoParent && joinCode.length < 6) return false;
+        return true;
+      }
       case STEP_ACCOUNT: {
         if (!email.trim() || !username.trim() || !password || !confirmPassword) return false;
         if (getAccountErrors().length > 0) return false;
@@ -183,31 +204,79 @@ export default function Onboarding() {
     }
   };
 
-  const totalSteps = hasMedical ? STEP_FAMILY_HISTORY + 1 : STEP_FAMILY_HISTORY;
-
   const handleNext = () => {
+    // Validate account step
     if (step === STEP_ACCOUNT && !skipAccountStep) {
       const errs = getAccountErrors();
       if (errs.length > 0) { setAccountError(errs[0]); return; }
       setAccountError('');
     }
+
+    // Co-parent: after parent name, finish
+    if (isCoParent && step === STEP_PARENT) {
+      finishCoParent();
+      return;
+    }
+
+    // Skip baby steps for co-parent
+    if (step === STEP_ROLE && isCoParent) {
+      // Jump to account step (or parent step if auth0)
+      setStep(skipAccountStep ? STEP_PARENT : STEP_ACCOUNT);
+      return;
+    }
+
+    // Skip conditions if no medical
     if (step === STEP_MEDICAL && hasMedical === false) {
       setStep(STEP_FAMILY_HISTORY);
       return;
     }
+
+    // Last step
     if (step === totalSteps - 1 || (step === STEP_FAMILY_HISTORY && !hasMedical)) {
       finish();
       return;
     }
+
     setStep(step + 1);
   };
 
   const handleBack = () => {
+    // Co-parent going back from parent step
+    if (isCoParent && step === STEP_PARENT) {
+      setStep(skipAccountStep ? STEP_ROLE : STEP_ACCOUNT);
+      return;
+    }
+    if (isCoParent && step === STEP_ACCOUNT) {
+      setStep(STEP_ROLE);
+      return;
+    }
     if (step === STEP_FAMILY_HISTORY && hasMedical === false) {
       setStep(STEP_MEDICAL);
       return;
     }
     setStep(step - 1);
+  };
+
+  const finishCoParent = () => {
+    // Save the join code to localStorage so Family page can use it
+    const existingFamilies = JSON.parse(localStorage.getItem('joinedFamilies') || '[]');
+    if (!existingFamilies.includes(joinCode)) {
+      existingFamilies.push(joinCode);
+      localStorage.setItem('joinedFamilies', JSON.stringify(existingFamilies));
+    }
+
+    if (!skipAccountStep) {
+      setAccount({ email: email.trim(), username: username.trim(), password });
+    }
+    setIsLoggedIn(true);
+    setParentName(parent.trim());
+    setBabyProfile({
+      firstName: '', lastName: '', dateOfBirth: '', sex: '',
+      hasMedicalConditions: false, medicalConditions: [],
+      familyHistory: [], familyHistoryOther: '',
+      state: '', onboardingComplete: true,
+    });
+    navigate('/home');
   };
 
   const finish = () => {
@@ -222,7 +291,9 @@ export default function Onboarding() {
       finalFamilyHistory[idx] = `Other: ${familyHistoryOther.trim()}`;
     }
 
-    setAccount({ email: email.trim(), username: username.trim(), password });
+    if (!skipAccountStep) {
+      setAccount({ email: email.trim(), username: username.trim(), password });
+    }
     setIsLoggedIn(true);
     setParentName(parent.trim());
     setBabyProfile({
@@ -240,6 +311,9 @@ export default function Onboarding() {
     navigate('/home');
   };
 
+  // For co-parent, progress is simpler
+  const progressSteps = isCoParent ? (STEP_PARENT + 1) : totalSteps;
+
   return (
     <div className="onboarding">
       <div className="onboarding-header">
@@ -249,7 +323,7 @@ export default function Onboarding() {
       </div>
 
       <div className="progress-bar">
-        <div className="progress-fill" style={{ width: `${((step + 1) / totalSteps) * 100}%` }} />
+        <div className="progress-fill" style={{ width: `${((step + 1) / progressSteps) * 100}%` }} />
       </div>
 
       <div className="onboarding-card">
@@ -276,6 +350,41 @@ export default function Onboarding() {
                 <div><strong>Journal & Memories</strong><span>Capture precious moments and reflections</span></div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Step 1: Role Selection */}
+        {step === STEP_ROLE && (
+          <div className="step">
+            <Users size={32} className="step-icon lavender" />
+            <h2>What's your role?</h2>
+            <p>Are you setting up a new baby profile or joining an existing family?</p>
+            <div className="option-group" style={{ flexDirection: 'column' }}>
+              <button className={`option-btn ${role === 'parent' ? 'selected' : ''}`} onClick={() => { setRole('parent'); setJoinError(''); }}>
+                <strong>Parent</strong>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginTop: 2 }}>Set up a new baby profile</span>
+              </button>
+              <button className={`option-btn ${role === 'coparent' ? 'selected' : ''}`} onClick={() => { setRole('coparent'); setJoinError(''); }}>
+                <strong>Co-Parent / Caregiver</strong>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginTop: 2 }}>Join an existing family with a code</span>
+              </button>
+            </div>
+            {role === 'coparent' && (
+              <div style={{ marginTop: 12 }}>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>Enter the 6-character family code shared with you:</p>
+                {joinError && <div className="login-error"><AlertCircle size={16} />{joinError}</div>}
+                <div className="join-row">
+                  <input
+                    type="text"
+                    placeholder="Enter code"
+                    value={joinCode}
+                    onChange={(e) => { setJoinCode(e.target.value.toUpperCase()); setJoinError(''); }}
+                    maxLength={6}
+                    autoFocus
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -319,107 +428,105 @@ export default function Onboarding() {
           </div>
         )}
 
-        {/* Step 3: Baby Name */}
-        {step === STEP_BABY && (
-          <div className="step">
-            <Baby size={32} className="step-icon lavender" />
-            <h2>Tell us about your little one</h2>
-            <p>Baby's name</p>
-            <input type="text" placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus />
-            <input type="text" placeholder="Last name (optional)" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-          </div>
-        )}
-
-        {/* Step 4: DOB */}
-        {step === STEP_DOB && (
-          <div className="step">
-            <Baby size={32} className="step-icon blue" />
-            <h2>When was {firstName || 'baby'} born?</h2>
-            <p>Scroll to select the date (or expected due date)</p>
-            <div className="dob-picker">
-              <ScrollColumn items={MONTHS} selectedIndex={selectedMonth} onSelect={setSelectedMonth} label="Month" />
-              <ScrollColumn items={dayItems.map(String)} selectedIndex={selectedDay} onSelect={setSelectedDay} label="Day" />
-              <ScrollColumn items={years.map(String)} selectedIndex={selectedYear} onSelect={setSelectedYear} label="Year" />
-            </div>
-            <div className="dob-preview">{MONTHS[selectedMonth]} {dayItems[selectedDay] || 1}, {years[selectedYear]}</div>
-          </div>
-        )}
-
-        {/* Step 5: Sex */}
-        {step === STEP_SEX && (
-          <div className="step">
-            <Baby size={32} className="step-icon pink" />
-            <h2>What's {firstName || 'baby'}'s sex?</h2>
-            <div className="option-group">
-              {['Male', 'Female'].map((s) => (
-                <button key={s} className={`option-btn ${sex === s ? 'selected' : ''}`} onClick={() => setSex(s)}>{s}</button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Step 6: State */}
-        {step === STEP_STATE && (
-          <div className="step">
-            <Shield size={32} className="step-icon blue" />
-            <h2>Where are you located?</h2>
-            <p>Select your state for localized vaccine schedules</p>
-            <div className="state-picker">
-              <ScrollColumn items={US_STATES} selectedIndex={selectedStateIdx} onSelect={setSelectedStateIdx} label="State" />
-            </div>
-            <div className="dob-preview">{US_STATES[selectedStateIdx]}</div>
-          </div>
-        )}
-
-        {/* Step 7: Has Medical? */}
-        {step === STEP_MEDICAL && (
-          <div className="step">
-            <Stethoscope size={32} className="step-icon green" />
-            <h2>Any medical conditions?</h2>
-            <p>Does {firstName || 'baby'} have any known medical conditions?</p>
-            <div className="option-group">
-              <button className={`option-btn ${hasMedical === true ? 'selected' : ''}`} onClick={() => setHasMedical(true)}>Yes</button>
-              <button className={`option-btn ${hasMedical === false ? 'selected' : ''}`} onClick={() => setHasMedical(false)}>No</button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 8: Conditions */}
-        {step === STEP_CONDITIONS && hasMedical && (
-          <div className="step">
-            <Stethoscope size={32} className="step-icon green" />
-            <h2>Select conditions</h2>
-            <p>Select all that apply</p>
-            <div className="condition-grid">
-              {MEDICAL_CONDITIONS.map((c) => (
-                <button key={c} className={`condition-chip ${conditions.includes(c) ? 'selected' : ''}`} onClick={() => toggleCondition(c)}>{c}</button>
-              ))}
-            </div>
-            {conditions.includes('Other') && (
-              <div className="other-condition-input">
-                <input type="text" placeholder="Please specify the condition..." value={otherCondition} onChange={(e) => setOtherCondition(e.target.value)} autoFocus />
+        {/* Baby steps - only for parent role */}
+        {!isCoParent && (
+          <>
+            {step === STEP_BABY && (
+              <div className="step">
+                <Baby size={32} className="step-icon lavender" />
+                <h2>Tell us about your little one</h2>
+                <p>Baby's name</p>
+                <input type="text" placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus />
+                <input type="text" placeholder="Last name (optional)" value={lastName} onChange={(e) => setLastName(e.target.value)} />
               </div>
             )}
-          </div>
-        )}
 
-        {/* Step 9: Family History */}
-        {step === STEP_FAMILY_HISTORY && (
-          <div className="step">
-            <Heart size={32} className="step-icon pink" />
-            <h2>Family Medical History</h2>
-            <p>Select any conditions that run in the family (optional — helps personalize AI advice)</p>
-            <div className="condition-grid">
-              {FAMILY_HISTORY_OPTIONS.map((c) => (
-                <button key={c} className={`condition-chip ${familyHistory.includes(c) ? 'selected' : ''}`} onClick={() => toggleFamilyHistory(c)}>{c}</button>
-              ))}
-            </div>
-            {familyHistory.includes('Other') && (
-              <div className="other-condition-input">
-                <input type="text" placeholder="Please specify..." value={familyHistoryOther} onChange={(e) => setFamilyHistoryOther(e.target.value)} />
+            {step === STEP_DOB && (
+              <div className="step">
+                <Baby size={32} className="step-icon blue" />
+                <h2>When was {firstName || 'baby'} born?</h2>
+                <p>Scroll to select the date (or expected due date)</p>
+                <div className="dob-picker">
+                  <ScrollColumn items={MONTHS} selectedIndex={selectedMonth} onSelect={setSelectedMonth} label="Month" />
+                  <ScrollColumn items={dayItems.map(String)} selectedIndex={selectedDay} onSelect={setSelectedDay} label="Day" />
+                  <ScrollColumn items={years.map(String)} selectedIndex={selectedYear} onSelect={setSelectedYear} label="Year" />
+                </div>
+                <div className="dob-preview">{MONTHS[selectedMonth]} {dayItems[selectedDay] || 1}, {years[selectedYear]}</div>
               </div>
             )}
-          </div>
+
+            {step === STEP_SEX && (
+              <div className="step">
+                <Baby size={32} className="step-icon pink" />
+                <h2>What's {firstName || 'baby'}'s sex?</h2>
+                <div className="option-group">
+                  {['Male', 'Female'].map((s) => (
+                    <button key={s} className={`option-btn ${sex === s ? 'selected' : ''}`} onClick={() => setSex(s)}>{s}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {step === STEP_STATE && (
+              <div className="step">
+                <Shield size={32} className="step-icon blue" />
+                <h2>Where are you located?</h2>
+                <p>Select your state for localized vaccine schedules</p>
+                <div className="state-picker">
+                  <ScrollColumn items={US_STATES} selectedIndex={selectedStateIdx} onSelect={setSelectedStateIdx} label="State" />
+                </div>
+                <div className="dob-preview">{US_STATES[selectedStateIdx]}</div>
+              </div>
+            )}
+
+            {step === STEP_MEDICAL && (
+              <div className="step">
+                <Stethoscope size={32} className="step-icon green" />
+                <h2>Any medical conditions?</h2>
+                <p>Does {firstName || 'baby'} have any known medical conditions?</p>
+                <div className="option-group">
+                  <button className={`option-btn ${hasMedical === true ? 'selected' : ''}`} onClick={() => setHasMedical(true)}>Yes</button>
+                  <button className={`option-btn ${hasMedical === false ? 'selected' : ''}`} onClick={() => setHasMedical(false)}>No</button>
+                </div>
+              </div>
+            )}
+
+            {step === STEP_CONDITIONS && hasMedical && (
+              <div className="step">
+                <Stethoscope size={32} className="step-icon green" />
+                <h2>Select conditions</h2>
+                <p>Select all that apply</p>
+                <div className="condition-grid">
+                  {MEDICAL_CONDITIONS.map((c) => (
+                    <button key={c} className={`condition-chip ${conditions.includes(c) ? 'selected' : ''}`} onClick={() => toggleCondition(c)}>{c}</button>
+                  ))}
+                </div>
+                {conditions.includes('Other') && (
+                  <div className="other-condition-input">
+                    <input type="text" placeholder="Please specify the condition..." value={otherCondition} onChange={(e) => setOtherCondition(e.target.value)} autoFocus />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {step === STEP_FAMILY_HISTORY && (
+              <div className="step">
+                <Heart size={32} className="step-icon pink" />
+                <h2>Family Medical History</h2>
+                <p>Select any conditions that run in the family (optional — helps personalize AI advice)</p>
+                <div className="condition-grid">
+                  {FAMILY_HISTORY_OPTIONS.map((c) => (
+                    <button key={c} className={`condition-chip ${familyHistory.includes(c) ? 'selected' : ''}`} onClick={() => toggleFamilyHistory(c)}>{c}</button>
+                  ))}
+                </div>
+                {familyHistory.includes('Other') && (
+                  <div className="other-condition-input">
+                    <input type="text" placeholder="Please specify..." value={familyHistoryOther} onChange={(e) => setFamilyHistoryOther(e.target.value)} />
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -431,7 +538,8 @@ export default function Onboarding() {
         )}
         <button className="btn-primary" disabled={!canNext()} onClick={handleNext}>
           {step === 0 ? 'Get Started'
-            : step === totalSteps - 1 ? "Let's Go!"
+            : (isCoParent && step === STEP_PARENT) ? "Let's Go!"
+            : step === totalSteps - 1 || (step === STEP_FAMILY_HISTORY && !hasMedical) ? "Let's Go!"
             : 'Next'}
           <ArrowRight size={18} />
         </button>

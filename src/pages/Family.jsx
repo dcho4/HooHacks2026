@@ -2,16 +2,17 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   Users,
-  UserPlus,
   Share2,
   Bell,
   Copy,
   Check,
   X,
   Baby,
-  Heart,
   Star,
   ShieldCheck,
+  Heart,
+  CheckCircle,
+  AlertCircle,
 } from 'lucide-react';
 
 function generateAndSaveCode() {
@@ -36,10 +37,8 @@ export default function Family() {
   const [inviteCode] = useState(generateAndSaveCode);
   const [joinCode, setJoinCode] = useState('');
   const [copied, setCopied] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newRole, setNewRole] = useState('Co-parent');
   const [sentReminder, setSentReminder] = useState(null);
+  const [joinStatus, setJoinStatus] = useState(null); // 'success' | 'error' | null
 
   const handleCopy = () => {
     navigator.clipboard?.writeText(inviteCode);
@@ -47,16 +46,40 @@ export default function Family() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleAdd = () => {
-    if (!newName.trim()) return;
-    addFamilyMember({ name: newName.trim(), role: newRole, initials: newName.trim().slice(0, 2).toUpperCase() });
-    setNewName('');
-    setShowAdd(false);
-  };
-
   const handleReminder = (label) => {
     setSentReminder(label);
     setTimeout(() => setSentReminder(null), 2000);
+  };
+
+  const handleJoin = () => {
+    if (joinCode.length < 6) return;
+
+    // Check if this code matches any known family code in localStorage
+    // In a real app this would be a backend lookup
+    const knownCodes = JSON.parse(localStorage.getItem('knownFamilyCodes') || '[]');
+
+    // Add the code to joined families
+    const joined = JSON.parse(localStorage.getItem('joinedFamilies') || '[]');
+    if (joined.includes(joinCode)) {
+      setJoinStatus('already');
+      setTimeout(() => setJoinStatus(null), 3000);
+      return;
+    }
+
+    // Save the joined family
+    joined.push(joinCode);
+    localStorage.setItem('joinedFamilies', JSON.stringify(joined));
+
+    // Add a family member entry to represent the connection
+    addFamilyMember({
+      name: `Family ${joinCode}`,
+      role: 'Linked Family',
+      initials: joinCode.slice(0, 2),
+    });
+
+    setJoinStatus('success');
+    setJoinCode('');
+    setTimeout(() => setJoinStatus(null), 3000);
   };
 
   return (
@@ -67,9 +90,6 @@ export default function Family() {
       <section className="card">
         <div className="card-header">
           <h2><Users size={18} /> Members</h2>
-          <button className="icon-btn" onClick={() => setShowAdd(true)}>
-            <UserPlus size={18} />
-          </button>
         </div>
 
         <div className="member-list">
@@ -93,28 +113,6 @@ export default function Family() {
             </div>
           ))}
         </div>
-
-        {showAdd && (
-          <div className="add-member-form">
-            <input
-              type="text"
-              placeholder="Name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              autoFocus
-            />
-            <select value={newRole} onChange={(e) => setNewRole(e.target.value)}>
-              <option>Co-parent</option>
-              <option>Grandparent</option>
-              <option>Caregiver</option>
-              <option>Other</option>
-            </select>
-            <div className="form-actions">
-              <button className="btn-secondary" onClick={() => setShowAdd(false)}>Cancel</button>
-              <button className="btn-primary" onClick={handleAdd}>Add</button>
-            </div>
-          </div>
-        )}
       </section>
 
       {/* Send Reminders */}
@@ -161,13 +159,21 @@ export default function Family() {
             type="text"
             placeholder="Enter code"
             value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+            onChange={(e) => { setJoinCode(e.target.value.toUpperCase()); setJoinStatus(null); }}
             maxLength={6}
           />
-          <button className="btn-primary" disabled={joinCode.length < 6}>
+          <button className="btn-primary" disabled={joinCode.length < 6} onClick={handleJoin}>
             Join
           </button>
         </div>
+        {joinStatus === 'success' && (
+          <p className="reminder-sent"><CheckCircle size={14} /> Successfully joined the family!</p>
+        )}
+        {joinStatus === 'already' && (
+          <p style={{ fontSize: 13, color: 'var(--amber-dark)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <AlertCircle size={14} /> You've already joined this family.
+          </p>
+        )}
       </section>
     </div>
   );
