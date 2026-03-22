@@ -1441,6 +1441,26 @@ body {
 .send-btn:hover { background: var(--primary-dark, var(--lavender-dark)); }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.new-chat-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: var(--primary-light, var(--lavender-light));
+  color: var(--primary-dark, var(--lavender-dark));
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.new-chat-btn:hover {
+  background: var(--primary, var(--lavender));
+  color: white;
+}
+
 /* ===== Family Page ===== */
 .family-page {
   padding-bottom: 16px;

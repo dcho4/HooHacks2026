@@ -79,6 +79,51 @@ export function AppProvider({ children }) {
   useEffect(() => { document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light'); }, [darkMode]);
   useEffect(() => { document.documentElement.setAttribute('data-color', theme); }, [theme]);
 
+  // ===== Family Sync =====
+  const SYNC_URL = '';
+  const myFamilyCode = localStorage.getItem('familyInviteCode') || '';
+  const joinedFamilyCode = (() => { try { const j = JSON.parse(localStorage.getItem('joinedFamilies') || '[]'); return j[0] || ''; } catch { return ''; } })();
+  const activeFamilyCode = myFamilyCode || joinedFamilyCode;
+  const isParentRole = !!myFamilyCode && !joinedFamilyCode;
+  const isCoParentRole = !!joinedFamilyCode;
+
+  // Parent: push shared data to sync server whenever it changes
+  useEffect(() => {
+    if (!isParentRole || !activeFamilyCode || !babyProfile.onboardingComplete) return;
+    const timeout = setTimeout(() => {
+      fetch(`${SYNC_URL}/api/family-sync/${activeFamilyCode}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          babyProfile, feedLogs, sleepLogs, growthEntries, vaccineStatus,
+          parentName: parentName,
+        }),
+      }).catch(() => {});
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [isParentRole, activeFamilyCode, babyProfile, feedLogs, sleepLogs, growthEntries, vaccineStatus]);
+
+  // Co-parent: pull family data on load and periodically
+  useEffect(() => {
+    if (!isCoParentRole || !joinedFamilyCode) return;
+    const pull = () => {
+      fetch(`${SYNC_URL}/api/family-sync/${joinedFamilyCode}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data) return;
+          if (data.babyProfile) setBabyProfile(prev => ({ ...prev, ...data.babyProfile, onboardingComplete: true }));
+          if (data.feedLogs) setFeedLogs(data.feedLogs);
+          if (data.sleepLogs) setSleepLogs(data.sleepLogs);
+          if (data.growthEntries) setGrowthEntries(data.growthEntries);
+          if (data.vaccineStatus) setVaccineStatus(data.vaccineStatus);
+        })
+        .catch(() => {});
+    };
+    pull();
+    const interval = setInterval(pull, 10000); // poll every 10s
+    return () => clearInterval(interval);
+  }, [isCoParentRole, joinedFamilyCode]);
+
   // Load data from backend when Auth0 authenticates
   const getToken = useCallback(async () => {
     if (hasAuth0 && auth0.getAccessTokenSilently) {

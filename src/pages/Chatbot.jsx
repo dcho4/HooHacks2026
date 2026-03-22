@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Send, Bot, User, Sparkles, Loader } from 'lucide-react';
+import { Send, Bot, User, Sparkles, Loader, RotateCcw } from 'lucide-react';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 
@@ -101,22 +101,44 @@ async function callGeminiAPI(systemPrompt, messages) {
   return text;
 }
 
+function getWelcomeMessage(parentName, babyProfile) {
+  return {
+    id: 0,
+    from: 'bot',
+    text: `Hi ${parentName || 'there'}! I'm BabyBot — your personal AI parenting assistant. I know all about ${babyProfile.firstName || 'your little one'}${babyProfile.medicalConditions?.length > 0 ? ', including their medical needs' : ''}. Ask me anything about sleep, feeding, development, activities, or just vent!`,
+  };
+}
+
 export default function Chatbot() {
   const { babyProfile, parentName, feedLogs, sleepLogs, growthEntries, getBabyAgeDays } = useApp();
-  const [messages, setMessages] = useState([
-    {
-      id: 0,
-      from: 'bot',
-      text: `Hi ${parentName || 'there'}! I'm BabyBot — your personal AI parenting assistant. I know all about ${babyProfile.firstName || 'your little one'}${babyProfile.medicalConditions?.length > 0 ? ', including their medical needs' : ''}. Ask me anything about sleep, feeding, development, activities, or just vent!`,
-    },
-  ]);
+
+  // Load messages from localStorage or start fresh
+  const [messages, setMessages] = useState(() => {
+    const saved = localStorage.getItem('chatMessages');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.length > 0) return parsed;
+    }
+    return [getWelcomeMessage(parentName, babyProfile)];
+  });
+
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef(null);
 
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('chatMessages', JSON.stringify(messages));
+  }, [messages]);
+
   useEffect(() => {
     scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
   }, [messages]);
+
+  const handleNewChat = () => {
+    const welcome = [getWelcomeMessage(parentName, babyProfile)];
+    setMessages(welcome);
+  };
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -169,12 +191,15 @@ export default function Chatbot() {
     <div className="chat-page">
       <div className="chat-header">
         <div className="bot-avatar"><Bot size={24} /></div>
-        <div>
+        <div style={{ flex: 1 }}>
           <h2>BabyBot</h2>
           <span className="bot-status">
             <Sparkles size={12} /> AI-powered, personalized for {babyProfile.firstName || 'your baby'}
           </span>
         </div>
+        <button className="new-chat-btn" onClick={handleNewChat} title="Start new chat">
+          <RotateCcw size={18} />
+        </button>
       </div>
 
       <div className="chat-messages" ref={scrollRef}>
