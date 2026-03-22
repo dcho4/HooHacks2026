@@ -1,0 +1,37 @@
+BabyBoo — Sources & References
+================================
+
+Research & Inspiration
+-----------------------
+- University of Virginia. "Q&A: Why Are a Child's First 1,000 Days So Critical to Brain Building?" UVA Today.
+  https://news.virginia.edu/content/qa-why-are-childs-first-1000-days-so-critical-brain-building
+
+Frameworks & Libraries
+-----------------------
+- React (v19) — UI framework. https://react.dev
+- Vite (v8) — Build tool and dev server. https://vite.dev
+- React Router DOM (v7) — Client-side routing. https://reactrouter.com
+- Lucide React — Icon library. https://lucide.dev
+- jsPDF — PDF generation for journal export. https://github.com/parallax/jsPDF
+- Express.js — Backend server framework. https://expressjs.com
+- better-sqlite3 — SQLite database driver. https://github.com/WiseLibs/better-sqlite3
+- Auth0 React SDK — Authentication. https://auth0.com/docs/libraries/auth0-react
+- cors — Express CORS middleware. https://github.com/expressjs/cors
+
+APIs & Services
+----------------
+- Google Gemini API (2.5 Flash) — AI chatbot responses. https://ai.google.dev/gemini-api
+- ngrok — Public tunneling for cross-device testing. https://ngrok.com
+- Web MediaDevices API — Browser camera access for snapshots. https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices
+
+AI Development Tools
+---------------------
+- Claude Code (Claude Opus 4.6) by Anthropic — AI coding assistant used for development.
+  https://claude.ai
+
+Data References
+----------------
+- CDC Recommended Immunization Schedule for Children and Adolescents.
+  https://www.cdc.gov/vaccines/schedules/hcp/imz/child-adolescent.html
+- State-specific vaccine requirements for childcare and school entry.
+  https://www.immunize.org/laws
