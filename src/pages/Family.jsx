@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   Users,
@@ -51,14 +51,11 @@ export default function Family() {
     setTimeout(() => setSentReminder(null), 2000);
   };
 
-  const handleJoin = () => {
+  const SYNC_URL = '';
+
+  const handleJoin = async () => {
     if (joinCode.length < 6) return;
 
-    // Check if this code matches any known family code in localStorage
-    // In a real app this would be a backend lookup
-    const knownCodes = JSON.parse(localStorage.getItem('knownFamilyCodes') || '[]');
-
-    // Add the code to joined families
     const joined = JSON.parse(localStorage.getItem('joinedFamilies') || '[]');
     if (joined.includes(joinCode)) {
       setJoinStatus('already');
@@ -66,21 +63,45 @@ export default function Family() {
       return;
     }
 
-    // Save the joined family
-    joined.push(joinCode);
-    localStorage.setItem('joinedFamilies', JSON.stringify(joined));
-
-    // Add a family member entry to represent the connection
-    addFamilyMember({
-      name: `Family ${joinCode}`,
-      role: 'Linked Family',
-      initials: joinCode.slice(0, 2),
-    });
-
-    setJoinStatus('success');
-    setJoinCode('');
-    setTimeout(() => setJoinStatus(null), 3000);
+    // Register with the sync server
+    try {
+      const res = await fetch(`${SYNC_URL}/api/family-sync/${joinCode}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: parentName || 'Co-parent', role: 'Co-parent' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Save locally
+        joined.push(joinCode);
+        localStorage.setItem('joinedFamilies', JSON.stringify(joined));
+        setJoinStatus('success');
+        setJoinCode('');
+        setTimeout(() => setJoinStatus(null), 3000);
+      } else {
+        setJoinStatus('error');
+        setTimeout(() => setJoinStatus(null), 3000);
+      }
+    } catch {
+      // Offline fallback — save locally anyway
+      joined.push(joinCode);
+      localStorage.setItem('joinedFamilies', JSON.stringify(joined));
+      setJoinStatus('success');
+      setJoinCode('');
+      setTimeout(() => setJoinStatus(null), 3000);
+    }
   };
+
+  // Load synced members from server
+  const [syncedMembers, setSyncedMembers] = useState([]);
+  useEffect(() => {
+    const code = localStorage.getItem('familyInviteCode');
+    if (!code) return;
+    fetch(`${SYNC_URL}/api/family-sync/${code}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.members) setSyncedMembers(data.members); })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="family-page">
@@ -100,6 +121,15 @@ export default function Family() {
               <span className="member-role">Primary</span>
             </div>
           </div>
+          {syncedMembers.filter(m => m.name !== parentName).map((m) => (
+            <div key={m.id} className="member-item">
+              <div className="avatar">{m.initials}</div>
+              <div>
+                <span className="member-name">{m.name}</span>
+                <span className="member-role">{m.role}</span>
+              </div>
+            </div>
+          ))}
           {familyMembers.map((m) => (
             <div key={m.id} className="member-item">
               <div className="avatar">{m.initials}</div>
