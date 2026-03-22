@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { Baby, Mail, Lock, ArrowRight, AlertCircle, Star } from 'lucide-react';
 
 export default function Login() {
-  const { login, loginWithAuth0, hasAuth0, resetApp } = useApp();
+  const { login, loginWithAuth0, hasAuth0, startNewAccount } = useApp();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,7 +26,7 @@ export default function Login() {
     if (hasAuth0) {
       loginWithAuth0({ authorizationParams: { screen_hint: 'signup' } });
     } else {
-      resetApp();
+      startNewAccount();
       navigate('/');
     }
   };

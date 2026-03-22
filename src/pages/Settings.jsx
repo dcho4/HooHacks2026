@@ -14,7 +14,7 @@ const THEMES = [
   { id: 'mint', label: 'Mint', color: '#a0d4a0' },
 ];
 
-const GEMINI_API_KEY = 'AIzaSyCDqsMZsQKDHFW6-R4Xphtv_SIlpWWVJEA';
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '(not set — add VITE_GEMINI_API_KEY to .env)';
 
 export default function SettingsPage() {
   const {

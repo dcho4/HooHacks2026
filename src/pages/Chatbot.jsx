@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Send, Bot, User, Sparkles, Loader } from 'lucide-react';
 
-const GEMINI_API_KEY = 'AIzaSyCDqsMZsQKDHFW6-R4Xphtv_SIlpWWVJEA';
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 
 function buildSystemPrompt(babyProfile, parentName, feedLogs, sleepLogs, growthEntries, getBabyAgeDays) {
   const ageDays = getBabyAgeDays();
@@ -121,8 +121,16 @@ export default function Chatbot() {
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     setInput('');
-    setLoading(true);
 
+    if (!GEMINI_API_KEY) {
+      setMessages((prev) => [...prev, {
+        id: Date.now() + 1, from: 'bot',
+        text: "BabyBot needs a Gemini API key to work. Add VITE_GEMINI_API_KEY to your .env file and restart the app. Get a free key at aistudio.google.com/apikey",
+      }]);
+      return;
+    }
+
+    setLoading(true);
     try {
       const systemPrompt = buildSystemPrompt(babyProfile, parentName, feedLogs, sleepLogs, growthEntries, getBabyAgeDays);
       const reply = await callGeminiAPI(systemPrompt, updatedMessages);

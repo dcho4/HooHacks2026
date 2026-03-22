@@ -231,6 +231,21 @@ export function AppProvider({ children }) {
     }
   };
 
+  // Clears all data and starts fresh onboarding (keeps user logged in)
+  const startNewAccount = () => {
+    setBabyProfile(defaultBabyProfile);
+    setFeedLogs([]); setSleepLogs([]); setFamilyMembers([]);
+    setGrowthEntries([]); setJournalEntries([]);
+    setParentName(''); setDarkMode(false); setTheme('lavender');
+    setDeveloperMode(false); setVaccineStatus({});
+    setRoutineChecks({ date: new Date().toISOString().split('T')[0], tasks: {} });
+    setSnapshots([]);
+    setLocalAccount({ email: '', username: '', password: '' });
+    setLocalLoggedIn(true); // stay logged in so routing goes to Onboarding
+    localStorage.clear();
+    localStorage.setItem('isLoggedIn', 'true'); // persist so it survives the clear
+  };
+
   const resetApp = async () => {
     setBabyProfile(defaultBabyProfile);
     setFeedLogs([]); setSleepLogs([]); setFamilyMembers([]);
@@ -299,7 +314,7 @@ export function AppProvider({ children }) {
         vaccineStatus, toggleVaccine,
         snapshots, addSnapshot,
         getBabyAgeDays, getLogsForDate, toLocalDateStr,
-        resetApp,
+        resetApp, startNewAccount,
       }}
     >
       {children}
