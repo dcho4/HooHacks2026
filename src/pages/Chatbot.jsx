@@ -60,7 +60,9 @@ GUIDELINES:
 - Keep responses concise (2-4 sentences) unless the parent asks for detail.
 - For medical concerns, always encourage consulting their pediatrician.
 - Give age-appropriate advice — newborn advice differs from 6-month advice.
-- Consider the baby's growth measurements when discussing feeding or development.`;
+- Consider the baby's growth measurements when discussing feeding or development.
+- Do NOT use markdown formatting like **bold** or *italics*. Write in plain text only.
+- NEVER diagnose any condition. NEVER prescribe treatment. Flag when pediatrician consultation is needed.`;
 }
 
 async function callGeminiAPI(systemPrompt, messages) {
@@ -74,27 +76,29 @@ async function callGeminiAPI(systemPrompt, messages) {
   if (contents.length === 0 || contents[0].role !== 'user') return null;
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents,
         systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents,
+        generationConfig: { maxOutputTokens: 1024 },
       }),
     }
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`API error (${response.status}): ${error}`);
+    const errorText = await response.text();
+    throw new Error(`Gemini API error ${response.status}: ${errorText}`);
   }
 
   const data = await response.json();
-  if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-    throw new Error('Unexpected API response format');
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new Error('Unexpected response format from Gemini API');
   }
-  return data.candidates[0].content.parts[0].text;
+  return text;
 }
 
 export default function Chatbot() {
@@ -143,7 +147,7 @@ export default function Chatbot() {
       setMessages((prev) => [...prev, {
         id: Date.now() + 1,
         from: 'bot',
-        text: `Sorry, something went wrong. Please try again in a moment.`,
+        text: err.message || 'Sorry, something went wrong. Please try again in a moment.',
       }]);
     } finally {
       setLoading(false);

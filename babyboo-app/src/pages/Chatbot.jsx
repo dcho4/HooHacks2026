@@ -86,8 +86,17 @@ async function callGeminiAPI(systemPrompt, messages) {
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`API error (${response.status}): ${error}`);
+    const errorText = await response.text();
+    if (response.status === 429) {
+      throw new Error('The AI is temporarily rate-limited. Please wait a minute and try again.');
+    }
+    if (response.status === 403) {
+      throw new Error('API key was revoked. Please generate a new key at aistudio.google.com/apikey and update your .env file.');
+    }
+    if (response.status === 400) {
+      throw new Error('Invalid API key. Please check your VITE_GEMINI_API_KEY in .env and restart the app.');
+    }
+    throw new Error(`API error (${response.status})`);
   }
 
   const data = await response.json();
@@ -143,7 +152,7 @@ export default function Chatbot() {
       setMessages((prev) => [...prev, {
         id: Date.now() + 1,
         from: 'bot',
-        text: `Sorry, something went wrong. Please try again in a moment.`,
+        text: err.message || 'Sorry, something went wrong. Please try again in a moment.',
       }]);
     } finally {
       setLoading(false);
