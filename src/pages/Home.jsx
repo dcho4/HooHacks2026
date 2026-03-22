@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { jsPDF } from 'jspdf';
 import {
   ListChecks, BookOpen, UtensilsCrossed, Moon, Camera, Dumbbell,
   TrendingUp, Plus, Droplets, X, ChevronLeft, ChevronRight,
-  Check, Circle, Image, RotateCcw, Save,
+  Check, Circle, Image, RotateCcw, Save, FileDown,
 } from 'lucide-react';
 
 const AFFIRMATIONS = [
@@ -149,7 +150,7 @@ export default function Home() {
     babyProfile, parentName, feedLogs, sleepLogs,
     addFeedLog, addSleepLog, journalEntries, addJournalEntry,
     getBabyAgeDays, toggleRoutineTask, getRoutineTasksForToday,
-    growthEntries, addSnapshot, snapshots,
+    growthEntries, addSnapshot, snapshots, toLocalDateStr, getLogsForDate,
   } = useApp();
 
   const [activeModal, setActiveModal] = useState(null);
@@ -181,13 +182,13 @@ export default function Home() {
   const displayName = parentName || 'Parent';
   const routineChecks = getRoutineTasksForToday();
 
-  // Selected date string for filtering
+  // Selected date string for filtering (local time)
   const selectedDateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
-  const isSelectedToday = selectedDateStr === todayStr;
+  const todayLocalStr = toLocalDateStr(new Date().toISOString());
+  const isSelectedToday = selectedDateStr === todayLocalStr;
 
-  // Filter logs by selected date
-  const selectedFeeds = feedLogs.filter((l) => l.timestamp?.startsWith(selectedDateStr));
-  const selectedSleeps = sleepLogs.filter((l) => l.timestamp?.startsWith(selectedDateStr));
+  // Filter logs by selected date using local time comparison
+  const { feeds: selectedFeeds, sleeps: selectedSleeps } = getLogsForDate(selectedDateStr);
 
   const latestWeight = growthEntries[0]?.weight || null;
   const routineTasks = getRoutineTasks(ageDays, babyProfile.sex, babyProfile.medicalConditions, latestWeight);
@@ -497,7 +498,32 @@ export default function Home() {
               <button className="btn-primary full-width" disabled={!journalText.trim()} onClick={handleAddJournal} style={{ marginTop: 8 }}><Plus size={18} /> Save Entry</button>
               {journalEntries.length > 0 && (
                 <>
-                  <label style={{ marginTop: 20 }}>Past Entries</label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 }}>
+                    <label style={{ margin: 0 }}>Past Entries</label>
+                    <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => {
+                      const doc = new jsPDF();
+                      doc.setFontSize(20);
+                      doc.text(`${babyProfile.firstName || 'Baby'}'s Journal`, 20, 20);
+                      doc.setFontSize(10);
+                      doc.text(`Exported ${new Date().toLocaleDateString()}`, 20, 28);
+                      let y = 40;
+                      journalEntries.forEach((entry) => {
+                        if (y > 270) { doc.addPage(); y = 20; }
+                        doc.setFontSize(10);
+                        doc.setTextColor(120);
+                        doc.text(new Date(entry.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }), 20, y);
+                        y += 6;
+                        doc.setFontSize(12);
+                        doc.setTextColor(40);
+                        const lines = doc.splitTextToSize(entry.text, 170);
+                        doc.text(lines, 20, y);
+                        y += lines.length * 6 + 8;
+                      });
+                      doc.save(`${babyProfile.firstName || 'baby'}-journal.pdf`);
+                    }}>
+                      <FileDown size={14} /> Export PDF
+                    </button>
+                  </div>
                   <div className="journal-entries-list">
                     {journalEntries.map((entry) => (
                       <div key={entry.id} className="journal-entry-card">

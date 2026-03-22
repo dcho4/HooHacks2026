@@ -10,14 +10,21 @@ import Medical from './pages/Medical';
 import SettingsPage from './pages/Settings';
 
 function AppRoutes() {
-  const { babyProfile, account, isLoggedIn } = useApp();
+  const { babyProfile, isLoggedIn, isLoading } = useApp();
   const onboarded = babyProfile.onboardingComplete;
-  const hasAccount = account.email && account.password;
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', fontFamily: 'var(--font)' }}>
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   const getLandingPage = () => {
-    if (hasAccount && onboarded && isLoggedIn) return <Navigate to="/home" replace />;
-    if (hasAccount && onboarded && !isLoggedIn) return <Login />;
-    return <Onboarding />;
+    if (isLoggedIn && onboarded) return <Navigate to="/home" replace />;
+    if (isLoggedIn && !onboarded) return <Onboarding />;
+    return <Login />;
   };
 
   return (

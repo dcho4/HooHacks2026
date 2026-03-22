@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { Baby, Heart, ArrowRight, ArrowLeft, Stethoscope, Star, Shield, BookOpen, Mail, Lock, User } from 'lucide-react';
+import { Baby, Heart, ArrowRight, ArrowLeft, Stethoscope, Star, Shield, BookOpen, Mail, Lock, User, AlertCircle } from 'lucide-react';
 
 const MEDICAL_CONDITIONS = [
   'Diabetes', 'Heart Condition', 'Premature Birth', 'Jaundice',
@@ -83,16 +83,17 @@ function ScrollColumn({ items, selectedIndex, onSelect, label }) {
 }
 
 export default function Onboarding() {
-  const { setBabyProfile, setParentName, parentName, setAccount, setIsLoggedIn } = useApp();
+  const { setBabyProfile, setParentName, parentName, setAccount, setIsLoggedIn, hasAuth0, auth0User } = useApp();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
 
-  // Account
+  // Account (local mode only)
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [accountError, setAccountError] = useState('');
+  const skipAccountStep = hasAuth0;
 
   // Baby
   const [parent, setParent] = useState(parentName || '');
@@ -138,64 +139,63 @@ export default function Onboarding() {
   };
 
   /*
-    Steps:
-    0 = Welcome splash
-    1 = Create account
-    2 = Parent name
-    3 = Baby name
-    4 = DOB scroll
-    5 = Sex
-    6 = State selection
-    7 = Medical conditions yes/no
-    8 = Medical conditions selection (if yes)
-    9 = Family history
+    Steps (local mode):    0=Welcome, 1=Account, 2=Parent, 3=Baby, 4=DOB, 5=Sex, 6=State, 7=Medical?, 8=Conditions, 9=FamilyHistory
+    Steps (Auth0 mode):    0=Welcome, 1=Parent, 2=Baby, 3=DOB, 4=Sex, 5=State, 6=Medical?, 7=Conditions, 8=FamilyHistory
   */
+  const STEP_ACCOUNT = skipAccountStep ? -1 : 1;
+  const offset = skipAccountStep ? 1 : 0;
+  const STEP_PARENT = 2 - offset;
+  const STEP_BABY = 3 - offset;
+  const STEP_DOB = 4 - offset;
+  const STEP_SEX = 5 - offset;
+  const STEP_STATE = 6 - offset;
+  const STEP_MEDICAL = 7 - offset;
+  const STEP_CONDITIONS = 8 - offset;
+  const STEP_FAMILY_HISTORY = 9 - offset;
+
+  // Live validation errors for account step
+  const getAccountErrors = () => {
+    const errs = [];
+    if (email.trim() && !email.includes('@')) errs.push('Enter a valid email address');
+    if (username.trim() && username.trim().length < 3) errs.push('Username must be at least 3 characters');
+    if (password && password.length < 6) errs.push('Password must be at least 6 characters');
+    if (confirmPassword && password !== confirmPassword) errs.push('Passwords do not match');
+    return errs;
+  };
 
   const canNext = () => {
     switch (step) {
       case 0: return true;
-      case 1: {
+      case STEP_ACCOUNT: {
         if (!email.trim() || !username.trim() || !password || !confirmPassword) return false;
-        if (password !== confirmPassword) return false;
-        if (password.length < 6) return false;
-        if (!email.includes('@')) return false;
+        if (getAccountErrors().length > 0) return false;
         return true;
       }
-      case 2: return parent.trim().length > 0;
-      case 3: return firstName.trim().length > 0;
-      case 4: return true;
-      case 5: return sex.length > 0;
-      case 6: return true;
-      case 7: return hasMedical !== null;
-      case 8: return conditions.length > 0;
-      case 9: return true; // family history is optional
+      case STEP_PARENT: return parent.trim().length > 0;
+      case STEP_BABY: return firstName.trim().length > 0;
+      case STEP_DOB: return true;
+      case STEP_SEX: return sex.length > 0;
+      case STEP_STATE: return true;
+      case STEP_MEDICAL: return hasMedical !== null;
+      case STEP_CONDITIONS: return conditions.length > 0;
+      case STEP_FAMILY_HISTORY: return true;
       default: return true;
     }
   };
 
-  const totalSteps = hasMedical ? 10 : 9;
+  const totalSteps = hasMedical ? STEP_FAMILY_HISTORY + 1 : STEP_FAMILY_HISTORY;
 
   const handleNext = () => {
-    if (step === 1) {
-      if (password !== confirmPassword) {
-        setAccountError('Passwords do not match.');
-        return;
-      }
-      if (password.length < 6) {
-        setAccountError('Password must be at least 6 characters.');
-        return;
-      }
-      if (!email.includes('@')) {
-        setAccountError('Please enter a valid email.');
-        return;
-      }
+    if (step === STEP_ACCOUNT && !skipAccountStep) {
+      const errs = getAccountErrors();
+      if (errs.length > 0) { setAccountError(errs[0]); return; }
       setAccountError('');
     }
-    if (step === 7 && hasMedical === false) {
-      setStep(9); // skip to family history
+    if (step === STEP_MEDICAL && hasMedical === false) {
+      setStep(STEP_FAMILY_HISTORY);
       return;
     }
-    if (step === totalSteps - 1) {
+    if (step === totalSteps - 1 || (step === STEP_FAMILY_HISTORY && !hasMedical)) {
       finish();
       return;
     }
@@ -203,8 +203,8 @@ export default function Onboarding() {
   };
 
   const handleBack = () => {
-    if (step === 9 && hasMedical === false) {
-      setStep(7);
+    if (step === STEP_FAMILY_HISTORY && hasMedical === false) {
+      setStep(STEP_MEDICAL);
       return;
     }
     setStep(step - 1);
@@ -279,34 +279,38 @@ export default function Onboarding() {
           </div>
         )}
 
-        {/* Step 1: Create Account */}
-        {step === 1 && (
+        {/* Step: Create Account (local mode only) */}
+        {step === STEP_ACCOUNT && !skipAccountStep && (
           <div className="step">
             <User size={32} className="step-icon lavender" />
             <h2>Create Your Account</h2>
             <p>Set up your login credentials</p>
-            {accountError && <div className="login-error"><span>{accountError}</span></div>}
+            {accountError && <div className="login-error"><AlertCircle size={16} /><span>{accountError}</span></div>}
             <div className="input-with-icon">
               <Mail size={18} />
-              <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
+              <input type="email" placeholder="Email address" value={email} onChange={(e) => { setEmail(e.target.value); setAccountError(''); }} autoFocus />
             </div>
+            {email.trim() && !email.includes('@') && <p className="field-error">Please enter a valid email</p>}
             <div className="input-with-icon">
               <User size={18} />
-              <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
+              <input type="text" placeholder="Username (min 3 chars)" value={username} onChange={(e) => { setUsername(e.target.value); setAccountError(''); }} />
             </div>
+            {username.trim() && username.trim().length < 3 && <p className="field-error">Username must be at least 3 characters</p>}
             <div className="input-with-icon">
               <Lock size={18} />
-              <input type="password" placeholder="Password (min 6 chars)" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <input type="password" placeholder="Password (min 6 chars)" value={password} onChange={(e) => { setPassword(e.target.value); setAccountError(''); }} />
             </div>
+            {password && password.length < 6 && <p className="field-error">Password must be at least 6 characters</p>}
             <div className="input-with-icon">
               <Lock size={18} />
-              <input type="password" placeholder="Confirm password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+              <input type="password" placeholder="Confirm password" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setAccountError(''); }} />
             </div>
+            {confirmPassword && password !== confirmPassword && <p className="field-error">Passwords do not match</p>}
           </div>
         )}
 
-        {/* Step 2: Parent Name */}
-        {step === 2 && (
+        {/* Step: Parent Name */}
+        {step === STEP_PARENT && (
           <div className="step">
             <Heart size={32} className="step-icon pink" />
             <h2>Let's get to know you!</h2>
@@ -316,7 +320,7 @@ export default function Onboarding() {
         )}
 
         {/* Step 3: Baby Name */}
-        {step === 3 && (
+        {step === STEP_BABY && (
           <div className="step">
             <Baby size={32} className="step-icon lavender" />
             <h2>Tell us about your little one</h2>
@@ -327,7 +331,7 @@ export default function Onboarding() {
         )}
 
         {/* Step 4: DOB */}
-        {step === 4 && (
+        {step === STEP_DOB && (
           <div className="step">
             <Baby size={32} className="step-icon blue" />
             <h2>When was {firstName || 'baby'} born?</h2>
@@ -342,7 +346,7 @@ export default function Onboarding() {
         )}
 
         {/* Step 5: Sex */}
-        {step === 5 && (
+        {step === STEP_SEX && (
           <div className="step">
             <Baby size={32} className="step-icon pink" />
             <h2>What's {firstName || 'baby'}'s sex?</h2>
@@ -355,7 +359,7 @@ export default function Onboarding() {
         )}
 
         {/* Step 6: State */}
-        {step === 6 && (
+        {step === STEP_STATE && (
           <div className="step">
             <Shield size={32} className="step-icon blue" />
             <h2>Where are you located?</h2>
@@ -368,7 +372,7 @@ export default function Onboarding() {
         )}
 
         {/* Step 7: Has Medical? */}
-        {step === 7 && (
+        {step === STEP_MEDICAL && (
           <div className="step">
             <Stethoscope size={32} className="step-icon green" />
             <h2>Any medical conditions?</h2>
@@ -381,7 +385,7 @@ export default function Onboarding() {
         )}
 
         {/* Step 8: Conditions */}
-        {step === 8 && hasMedical && (
+        {step === STEP_CONDITIONS && hasMedical && (
           <div className="step">
             <Stethoscope size={32} className="step-icon green" />
             <h2>Select conditions</h2>
@@ -400,7 +404,7 @@ export default function Onboarding() {
         )}
 
         {/* Step 9: Family History */}
-        {step === 9 && (
+        {step === STEP_FAMILY_HISTORY && (
           <div className="step">
             <Heart size={32} className="step-icon pink" />
             <h2>Family Medical History</h2>

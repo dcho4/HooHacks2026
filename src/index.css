@@ -2147,5 +2147,32 @@ body {
   color: var(--red);
 }
 
+/* ===== Field Errors ===== */
+.field-error {
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 600;
+  margin: -8px 0 8px 4px;
+}
+
+/* ===== Profile Display ===== */
+.profile-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.profile-display svg {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
 /* ===== Utilities ===== */
 .hidden { display: none !important; }
