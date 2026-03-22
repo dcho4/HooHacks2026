@@ -310,7 +310,7 @@ export default function Home() {
           <h1>Hi {displayName}!</h1>
           <p className="affirmation">{getAffirmation()}</p>
           {babyProfile.firstName && ageDays !== null && ageDays >= 0 && (
-            <span className="baby-age-badge">{babyProfile.firstName} — {ageWeeks > 0 ? `${ageWeeks} weeks` : `${ageDays} days`} old</span>
+            <span className="baby-age-badge">{babyProfile.firstName} — Day {Math.min(ageDays, 1000)} of 1000</span>
           )}
           {babyProfile.firstName && ageDays !== null && ageDays < 0 && (
             <span className="baby-age-badge">{babyProfile.firstName} — {Math.abs(ageDays)} days until due date</span>
@@ -416,7 +416,7 @@ export default function Home() {
       <div className="weekly-summary">
         <TrendingUp size={20} />
         <div>
-          <h3>Weekly Summary</h3>
+          <h3>Total Summary</h3>
           <p>{feedLogs.length} feeds &middot; {sleepLogs.length} sleep sessions{journalEntries.length > 0 && ` · ${journalEntries.length} journal entries`}</p>
         </div>
       </div>

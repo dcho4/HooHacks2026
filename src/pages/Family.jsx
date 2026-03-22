@@ -14,10 +14,13 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
-function generateInviteCode() {
+function generateAndSaveCode() {
+  const saved = localStorage.getItem('familyInviteCode');
+  if (saved) return saved;
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let code = '';
   for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  localStorage.setItem('familyInviteCode', code);
   return code;
 }
 
@@ -30,7 +33,7 @@ const REMINDER_TYPES = [
 
 export default function Family() {
   const { familyMembers, addFamilyMember, removeFamilyMember, parentName } = useApp();
-  const [inviteCode] = useState(generateInviteCode);
+  const [inviteCode] = useState(generateAndSaveCode);
   const [joinCode, setJoinCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
